@@ -16,6 +16,7 @@ import CreateTrip from "./pages/CreateTrip";
 import TripDetails from "./pages/TripDetails";
 import Start from "./pages/Start";
 import NotFound from "./pages/NotFound";
+import JoinTrip from "./pages/JoinTrip";
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { auth } from "./lib/firebase";
@@ -57,6 +58,7 @@ const App = () => {
                     <Route path="/register" element={<Register />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/create-trip" element={<CreateTrip />} />
+                    <Route path="/trip/:id/join" element={<JoinTrip />} />
                     <Route path="/trip/:id" element={<TripDetails />} />
                     <Route path="/start" element={<Start />} />
                     <Route path="*" element={<NotFound />} />

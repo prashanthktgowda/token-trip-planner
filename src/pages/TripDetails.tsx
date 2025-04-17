@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -25,6 +24,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { generateInviteLink, sendInvitation } from "@/utils/invitationService";
 
 // Trip and Expense types
 type Trip = {
@@ -260,32 +260,31 @@ const TripDetails = () => {
     if (!id || !auth.currentUser || !isAdmin) return;
 
     try {
-      // In a real app, you would send an email invitation
-      // and the user would accept it to be added to the trip
-      // For now, we'll just update the trip document with a simulated user ID
-      
-      const simulatedUserId = `invited-${Date.now()}`;
-      
-      const tripRef = doc(db, "trips", id);
-      
-      await updateDoc(tripRef, {
-        participants: arrayUnion(simulatedUserId),
-        ...(inviteAsAdmin && { admins: arrayUnion(simulatedUserId) }),
+      const inviteId = await sendInvitation(id, inviteEmail, inviteAsAdmin);
+      const inviteLink = generateInviteLink(id);
+
+      // In a real app, this would be sent via email
+      // For demo purposes, we'll show it in a toast
+      toast({
+        title: "Invitation sent!",
+        description: (
+          <div className="mt-2 space-y-2">
+            <p>Invitation sent to {inviteEmail}</p>
+            <p className="text-xs text-muted-foreground break-all">
+              Invite link: {inviteLink}
+            </p>
+          </div>
+        ),
       });
 
-      toast({
-        title: "Invitation sent",
-        description: `Invitation sent to ${inviteEmail}`,
-      });
+      setInviteEmail("");
+      setInviteAsAdmin(false);
 
       // Update participants list (simulated)
       setParticipants([
         ...participants,
-        { id: simulatedUserId, email: inviteEmail }
+        { id: inviteId, email: inviteEmail }
       ]);
-
-      setInviteEmail("");
-      setInviteAsAdmin(false);
     } catch (error: any) {
       toast({
         title: "Error sending invitation",
@@ -345,8 +344,8 @@ const TripDetails = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Card className="p-6 mb-8">
+    <div className="container mx-auto px-4 py-8 min-h-screen bg-gradient-to-b from-background to-accent/20">
+      <Card className="p-6 mb-8 backdrop-blur-sm bg-background/80 border border-accent/20">
         <div className="flex flex-col md:flex-row justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-indigo-600 mb-2">{trip.name}</h1>
@@ -377,13 +376,16 @@ const TripDetails = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap space-x-2 mb-4">
-          <Button className="bg-indigo-600 hover:bg-indigo-700" asChild>
+        <div className="flex flex-wrap gap-3 mb-4">
+          <Button 
+            className="bg-primary/90 hover:bg-primary transition-colors duration-300 shadow-lg" 
+            asChild
+          >
             <Dialog>
               <DialogTrigger>
                 <Plus className="mr-2 h-4 w-4" /> Add Expense
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="bg-background/95 backdrop-blur-sm">
                 <DialogHeader>
                   <DialogTitle>Add New Expense</DialogTitle>
                   <DialogDescription>
@@ -468,16 +470,19 @@ const TripDetails = () => {
           </Button>
 
           {isAdmin && (
-            <Button className="bg-indigo-600 hover:bg-indigo-700" asChild>
+            <Button 
+              className="bg-primary/90 hover:bg-primary transition-colors duration-300 shadow-lg"
+              asChild
+            >
               <Dialog>
                 <DialogTrigger>
                   <UserPlus className="mr-2 h-4 w-4" /> Invite
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="bg-background/95 backdrop-blur-sm">
                   <DialogHeader>
                     <DialogTitle>Invite Participant</DialogTitle>
                     <DialogDescription>
-                      Invite someone to join this trip.
+                      Send an invitation link to join this trip.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
@@ -489,6 +494,7 @@ const TripDetails = () => {
                         placeholder="friend@example.com"
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
+                        className="bg-background/50"
                         required
                       />
                     </div>
@@ -498,7 +504,7 @@ const TripDetails = () => {
                         id="admin"
                         checked={inviteAsAdmin}
                         onChange={(e) => setInviteAsAdmin(e.target.checked)}
-                        className="rounded border-gray-300"
+                        className="rounded border-accent"
                       />
                       <Label htmlFor="admin">Invite as Admin</Label>
                     </div>
@@ -509,7 +515,7 @@ const TripDetails = () => {
                     </DialogClose>
                     <DialogClose asChild>
                       <Button 
-                        className="bg-indigo-600 hover:bg-indigo-700" 
+                        className="bg-primary/90 hover:bg-primary"
                         onClick={handleInviteParticipant}
                       >
                         Send Invitation
@@ -530,7 +536,7 @@ const TripDetails = () => {
           </Button>
         </div>
 
-        <Tabs defaultValue="expenses">
+        <Tabs defaultValue="expenses" className="bg-background/40 p-4 rounded-lg backdrop-blur-sm">
           <TabsList>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="participants">Participants</TabsTrigger>
@@ -550,7 +556,85 @@ const TripDetails = () => {
                       <Plus className="mr-2 h-4 w-4" /> Add First Expense
                     </DialogTrigger>
                     <DialogContent>
-                      {/* Add expense dialog content (same as above) */}
+                      <DialogHeader>
+                        <DialogTitle>Add New Expense</DialogTitle>
+                        <DialogDescription>
+                          Record a new expense for this trip.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="description">Description</Label>
+                          <Input
+                            id="description"
+                            placeholder="Hotel stay, Dinner, etc."
+                            value={newExpense.description}
+                            onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="amount">Amount (Tokens)</Label>
+                          <Input
+                            id="amount"
+                            type="number"
+                            placeholder="500"
+                            value={newExpense.amount}
+                            onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                            required
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="date">Date</Label>
+                            <Input
+                              id="date"
+                              type="date"
+                              value={newExpense.date}
+                              onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="category">Category</Label>
+                            <select
+                              id="category"
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              value={newExpense.category}
+                              onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+                            >
+                              <option value="food">Food</option>
+                              <option value="accommodation">Accommodation</option>
+                              <option value="transportation">Transportation</option>
+                              <option value="activities">Activities</option>
+                              <option value="shopping">Shopping</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="location">Location (Optional)</Label>
+                          <Input
+                            id="location"
+                            placeholder="Restaurant name, store, etc."
+                            value={newExpense.location}
+                            onChange={(e) => setNewExpense({...newExpense, location: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-3">
+                        <DialogClose asChild>
+                          <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <DialogClose asChild>
+                          <Button 
+                            className="bg-indigo-600 hover:bg-indigo-700" 
+                            onClick={handleAddExpense}
+                          >
+                            Add Expense
+                          </Button>
+                        </DialogClose>
+                      </div>
                     </DialogContent>
                   </Dialog>
                 </Button>
